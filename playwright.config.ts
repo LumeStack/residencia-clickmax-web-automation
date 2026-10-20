@@ -19,5 +19,10 @@ export default defineConfig({
       testMatch: /tests\/public\/.*\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'auth',
+      testMatch: /tests\/auth\/.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
 });
