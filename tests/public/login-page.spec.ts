@@ -12,4 +12,20 @@ test.describe('Página de login', { tag: ['@smoke', '@safe'] }, () => {
     await expect(login.submit).toBeVisible();
     await expect(login.forgotPassword).toBeVisible();
   });
+
+  test('exibe erros ao enviar sem preencher', async ({ page }) => {
+    const login = new LoginPage(page);
+    await login.goto();
+
+    await expect(login.emailError).not.toBeVisible();
+    await expect(login.passwordError).not.toBeVisible();
+    await login.submit.click();
+
+    await expect(login.emailError).toBeVisible();
+    await expect(login.emailError).toHaveText('Insira o seu e-mail');
+    await expect(login.passwordError).toBeVisible();
+    await expect(login.passwordError).toHaveText('Insira a sua senha');
+
+    await expect(page).toHaveURL(/\/login/);
+  })
 });
