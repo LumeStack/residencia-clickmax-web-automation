@@ -27,5 +27,5 @@ test.describe('Página de login', { tag: ['@smoke', '@safe'] }, () => {
     await expect(login.passwordError).toHaveText('Insira a sua senha');
 
     await expect(page).toHaveURL(/\/login/);
-  })
+  });
 });

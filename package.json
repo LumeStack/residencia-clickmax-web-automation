@@ -1,10 +1,11 @@
 {
   "name": "clickmax-automation",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Automação de testes da Residência ClickMax (LumeStack)",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "playwright test",
+    "test:public": "playwright test --project=public",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
