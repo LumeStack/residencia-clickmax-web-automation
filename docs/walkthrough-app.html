@@ -1,0 +1,734 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>ClickMax Code Walkthrough</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg:#141228; --surface:#1c1a30; --surface-2:#252140; --surface-3:#2d2850;
+  --text:#ECE9F7; --text-soft:#9B95BE; --text-faint:#6B6690;
+  --accent:#F2A93C; --accent-soft:#6b5323; --keyword:#7DD3FC; --string:#7EE8C8;
+  --comment:#6B7280; --border:#332E55; --border-soft:#241F3F;
+  --critical:#F2718A;
+  color-scheme: dark;
+}
+*{box-sizing:border-box;}
+body{
+  background:var(--bg); color:var(--text); margin:0;
+  font-family:'IBM Plex Sans',sans-serif;
+}
+h1,h2,h3,h4,.mono{font-family:'IBM Plex Mono',monospace;}
+code,pre,.code{font-family:'IBM Plex Mono',monospace;}
+
+.app{display:flex; min-height:100dvh;}
+
+.rail{
+  width:280px; flex:0 0 280px; background:var(--surface); border-right:1px solid var(--border-soft);
+  padding: max(20px, env(safe-area-inset-top,0px)) 0 20px max(16px, env(safe-area-inset-left,0px));
+  position:sticky; top:0; height:100dvh; overflow-y:auto;
+}
+.rail-head{padding:4px 20px 18px;}
+.rail-head .kicker{color:var(--accent); font-size:11px; font-weight:600; letter-spacing:.12em;}
+.rail-head h1{font-size:17px; margin:6px 0 2px; line-height:1.3;}
+.rail-head p{font-size:12.5px; color:var(--text-soft); margin:0; font-family:'IBM Plex Sans';}
+
+.rail-group{margin-top:10px;}
+.rail-group-label{
+  font-size:10.5px; color:var(--text-faint); letter-spacing:.1em; padding:8px 20px 6px; font-weight:600;
+}
+.rail-item{
+  display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:none; border:none;
+  color:var(--text-soft); padding:9px 20px; cursor:pointer; font-size:13.5px; font-family:'IBM Plex Sans';
+  border-left:2px solid transparent;
+}
+.rail-item .num{
+  font-family:'IBM Plex Mono'; font-size:11px; color:var(--text-faint); width:20px; flex:0 0 20px;
+}
+.rail-item:hover{background:var(--surface-2); color:var(--text);}
+.rail-item.active{background:var(--surface-2); color:var(--text); border-left-color:var(--accent); font-weight:600;}
+.rail-item.active .num{color:var(--accent);}
+
+.main{flex:1; min-width:0; padding: max(32px, env(safe-area-inset-top,0px)) max(40px, env(safe-area-inset-right,0px)) 60px max(40px, 0px);}
+.topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; gap:16px; flex-wrap:wrap;}
+.crumb{font-size:12px; color:var(--text-faint); letter-spacing:.06em;}
+.progress-pill{font-family:'IBM Plex Mono'; font-size:12px; color:var(--text-soft); background:var(--surface); border:1px solid var(--border); padding:4px 10px; border-radius:999px;}
+
+.panel{display:none;}
+.panel.active{display:block;}
+
+.file-head{margin-bottom:22px;}
+.file-head .path{color:var(--accent); font-size:13px; font-weight:600;}
+.file-head h2{font-size:26px; margin:6px 0 8px; line-height:1.25;}
+.file-head p{color:var(--text-soft); font-size:15px; max-width:680px; margin:0;}
+
+.layout-2col{display:grid; grid-template-columns: minmax(0,1.15fr) minmax(0,0.85fr); gap:22px; align-items:start;}
+@media (max-width: 980px){ .layout-2col{grid-template-columns:1fr;} }
+
+.codecard{
+  background:#0F0D20; border:1px solid var(--border); border-radius:10px; overflow:hidden;
+  position:sticky; top:20px;
+}
+@media (max-width: 980px){ .codecard{position:static;} }
+.codecard-head{
+  display:flex; align-items:center; justify-content:space-between; padding:9px 14px;
+  border-bottom:1px solid var(--border-soft); background:#120F24;
+}
+.codecard-head span{font-size:11.5px; color:var(--text-faint); letter-spacing:.04em;}
+.codebody{overflow-x:auto; max-height:70vh; overflow-y:auto;}
+.codeline{display:flex; min-width:0;}
+.codeline .ln{
+  flex:0 0 38px; text-align:right; padding:2px 10px 2px 0; color:var(--text-faint); font-size:12.5px;
+  user-select:none; border-right:1px solid var(--border-soft);
+}
+.codeline .lc{padding:2px 14px; font-size:12.5px; white-space:pre; line-height:1.65; color:var(--text);}
+.codeline.hl{background:var(--accent-soft);}
+.codeline.hl .ln{color:var(--accent); font-weight:700;}
+.tok-str{color:var(--string);}
+.tok-com{color:var(--comment); font-style:italic;}
+.tok-kw{color:var(--keyword);}
+.tok-num{color:#F2A93C;}
+
+.notes{display:flex; flex-direction:column; gap:10px;}
+.note{
+  background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px;
+  cursor:pointer; transition:background .15s, border-color .15s;
+}
+.note:hover{background:var(--surface-2);}
+.note.active{border-color:var(--accent); background:var(--surface-2);}
+.note .tag{
+  font-family:'IBM Plex Mono'; font-size:10.5px; color:var(--accent); letter-spacing:.05em;
+  display:inline-block; margin-bottom:6px;
+}
+.note p{margin:0; font-size:14px; line-height:1.55; color:var(--text);}
+.note p b{color:var(--text); font-weight:600;}
+.note code{background:#0F0D20; padding:1px 5px; border-radius:4px; font-size:12.5px; color:var(--string);}
+
+.concept-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:16px;}
+@media (max-width:760px){ .concept-grid{grid-template-columns:1fr;} }
+.concept{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px 20px;}
+.concept h3{font-size:15.5px; margin:0 0 8px; color:var(--accent);}
+.concept p{font-size:14px; color:var(--text-soft); line-height:1.6; margin:0 0 10px;}
+.concept .snippet{
+  background:#0F0D20; border:1px solid var(--border-soft); border-radius:7px; padding:9px 12px;
+  font-size:12.5px; color:var(--string); white-space:pre; overflow-x:auto;
+}
+
+.nav-footer{
+  display:flex; align-items:center; justify-content:space-between; margin-top:32px; gap:12px;
+}
+.nav-btn{
+  background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:'IBM Plex Mono';
+  font-size:13px; padding:10px 16px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:8px;
+}
+.nav-btn:hover{background:var(--surface-2);}
+.nav-btn:disabled{opacity:.3; cursor:default;}
+.nav-btn .sub{color:var(--text-faint); font-family:'IBM Plex Sans'; font-size:11.5px;}
+
+@media (max-width: 860px){
+  .app{flex-direction:column;}
+  .rail{
+    position:sticky; width:100%; height:auto; flex:none; border-right:none; border-bottom:1px solid var(--border-soft);
+    padding: max(14px, env(safe-area-inset-top,0px)) 0 10px;
+  }
+  .rail-head{display:none;}
+  .rail-scroll{display:flex; overflow-x:auto; gap:4px; padding:0 max(16px, env(safe-area-inset-left,0px)) 4px;}
+  .rail-group{display:contents;}
+  .rail-group-label{display:none;}
+  .rail-item{
+    border-left:none; border-bottom:2px solid transparent; white-space:nowrap; flex:0 0 auto; padding:8px 12px;
+  }
+  .rail-item.active{border-bottom-color:var(--accent);}
+  .main{padding: 20px max(16px, env(safe-area-inset-right,0px)) 60px max(16px, env(safe-area-inset-left,0px));}
+  .file-head h2{font-size:21px;}
+}
+</style>
+
+<div class="app">
+  <nav class="rail">
+    <div class="rail-head">
+      <div class="kicker">RESIDÊNCIA CLICKMAX</div>
+      <h1>Code Walkthrough</h1>
+      <p>Automação de testes, explicada do zero.</p>
+    </div>
+    <div class="rail-scroll" id="railScroll"></div>
+  </nav>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumb" id="crumb">FUNDAMENTOS</div>
+      <div class="progress-pill" id="progressPill">1 / 11</div>
+    </div>
+    <div id="panels"></div>
+    <div class="nav-footer">
+      <button class="nav-btn" id="prevBtn">&#8592; <span class="sub" id="prevLabel"></span></button>
+      <button class="nav-btn" id="nextBtn"><span class="sub" id="nextLabel"></span> &#8594;</button>
+    </div>
+  </main>
+</div>
+
+<script>
+const CONCEPTS = [
+  { title: 'Automação de testes', text: 'Testar manualmente é uma pessoa clicando e conferindo na tela. Automação é escrever código que faz isso sozinho, em segundos, e avisa quando algo quebra.' },
+  { title: 'O que é Playwright', text: 'Uma biblioteca (da Microsoft) que controla um navegador de verdade via código: abre páginas, clica, digita, confere textos.' },
+  { title: 'O que é TypeScript', text: 'JavaScript "com rótulos". Você declara o tipo de cada coisa, e o editor avisa antes de rodar se algo estiver errado.', snippet: 'let idade: number = 25;\nidade = "vinte e cinco"; // erro na hora' },
+  { title: 'async / await', text: 'Ações no navegador (clicar, navegar) levam um tempinho. "await" diz: espera essa ação terminar antes de seguir pra próxima linha.', snippet: 'await campo.fill("texto");\nawait botao.click();' },
+  { title: 'Locator', text: 'É como o Playwright encontra um elemento na tela — "me dá uma referência pro botão com esse atributo/texto".' },
+  { title: 'Page Object', text: 'Uma classe que representa uma tela: guarda os elementos e as ações dela num lugar só. Se a tela mudar, você corrige em um lugar, não em cada teste.' },
+  { title: 'Variável de ambiente (.env)', text: 'Guarda senha/email de teste fora do código, num arquivo que nunca vai pro GitHub — ninguém vê o segredo olhando o código.' },
+  { title: 'CI/CD (GitHub Actions)', text: 'Um robô que roda os testes automaticamente, numa máquina do GitHub, sem precisar rodar na sua manualmente toda vez.' },
+];
+</script>
+<script>
+const FILES = [];
+
+FILES.push({
+  id: 'package-json',
+  path: 'package.json',
+  title: 'package.json — o "RG" do projeto',
+  desc: 'Lista de comandos e bibliotecas do projeto.',
+  code: `{
+  "name": "clickmax-automation",
+  "version": "1.0.0",
+  "description": "Automação de testes da Residência ClickMax (LumeStack)",
+  "scripts": {
+    "test": "playwright test",
+    "test:public": "playwright test --project=public",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.5",
+    "dotenv": "^18.0.8",
+    "typescript": "^7.0.2"
+  }
+}`,
+  notes: [
+    { lines: [2,3,4], tag: 'IDENTIFICAÇÃO', html: 'Nome, versão e descrição do projeto — só identificação, nada técnico.' },
+    { lines: [5,6,7,8,9], tag: 'ATALHOS', html: '<b>scripts</b>: comandos curtos. <code>npm test</code> roda tudo; <code>npm run test:public</code> roda só o grupo sem login; <code>npm run typecheck</code> confere os tipos sem gerar arquivo.' },
+    { lines: [13], tag: 'MÓDULOS', html: '<code>"type": "commonjs"</code> diz ao Node.js qual "dialeto" de importação usar (<code>require(...)</code>, o mais clássico).' },
+    { lines: [14,15,16,17,18,19], tag: 'DEPENDÊNCIAS', html: '<b>devDependencies</b>: bibliotecas usadas só durante desenvolvimento/teste — nunca entram no produto final. O Playwright, os tipos do Node, o leitor de <code>.env</code> (dotenv) e o próprio TypeScript.' },
+  ],
+});
+
+FILES.push({
+  id: 'tsconfig-json',
+  path: 'tsconfig.json',
+  title: 'tsconfig.json — as regras do TypeScript',
+  desc: 'Configura como o TypeScript vai checar o seu código.',
+  code: `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["src", "tests", "playwright.config.ts"]
+}`,
+  notes: [
+    { lines: [3], tag: 'VERSÃO', html: '<code>target</code>: qual versão do JavaScript final o código pode usar (ES2022 é recente).' },
+    { lines: [5], tag: 'O MAIS IMPORTANTE', html: '<code>"strict": true</code> liga o modo rígido: o TypeScript passa a exigir que você seja explícito com os tipos, sem deixar passar nada "meio certo".' },
+    { lines: [6,7], tag: 'COMPATIBILIDADE', html: '<code>esModuleInterop</code> e <code>skipLibCheck</code> são ajustes padrão que quase todo projeto TypeScript usa — não precisa decorar o porquê agora.' },
+    { lines: [8], tag: 'SÓ CHECAR', html: '<code>noEmit</code>: "só verifica os tipos, não gera nenhum arquivo novo."' },
+    { lines: [11], tag: 'ONDE OLHAR', html: '<code>include</code>: quais pastas o TypeScript deve de fato checar.' },
+  ],
+});
+</script>
+<script>
+FILES.push({
+  id: 'playwright-config',
+  path: 'playwright.config.ts',
+  title: 'playwright.config.ts — as configurações dos testes',
+  desc: 'Como, onde, e em quais grupos os testes rodam.',
+  code: `import { defineConfig, devices } from '@playwright/test';
+import 'dotenv/config';
+
+export default defineConfig({
+  testDir: './tests',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 1 : 0,
+  reporter: [['list'], ['html', { open: 'never' }]],
+  use: {
+    baseURL: process.env.BASE_URL ?? 'https://app.clickmax.io',
+    locale: 'pt-BR',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+  },
+  projects: [
+    {
+      name: 'public',
+      testMatch: /tests\/public\/.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'auth',
+      testMatch: /tests\/auth\/.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
+});`,
+  notes: [
+    { lines: [2], tag: 'CARREGA O .ENV', html: '<code>import \'dotenv/config\'</code> não traz nada "pro código" — ela só executa o pacote dotenv, que lê o arquivo <code>.env</code> e carrega tudo em <code>process.env</code>.' },
+    { lines: [6], tag: 'PARALELO', html: '<code>fullyParallel: true</code>: aqui dá pra rodar vários testes ao mesmo tempo, porque não existe um banco de dados compartilhado pra zerar entre eles.' },
+    { lines: [7], tag: 'TRAVA DE SEGURANÇA', html: '<code>forbidOnly</code>: existe um comando <code>test.only(...)</code> que roda só um teste. Se alguém esquecer isso no código e for pro CI, o CI quebra de propósito (<code>!!process.env.CI</code>) pra alguém notar.' },
+    { lines: [8], tag: 'OPERADOR TERNÁRIO', html: '<code>condição ? valorSeVerdadeiro : valorSeFalso</code>. Aqui: "se estiver no CI, tenta de novo 1 vez se falhar; na sua máquina, não tenta de novo."' },
+    { lines: [9], tag: 'RELATÓRIO', html: 'Mostra lista no terminal e gera relatório visual em HTML.' },
+    { lines: [11], tag: 'COALESCÊNCIA NULA (??)', html: '<code>a ?? b</code>: "usa <b>a</b>, a não ser que ele seja vazio — aí usa <b>b</b>." Usa o endereço do <code>.env</code> se existir, senão usa o padrão.' },
+    { lines: [12], tag: 'IDIOMA', html: '<code>locale: \'pt-BR\'</code> faz o navegador simulado se comportar como um usuário brasileiro — importante porque as mensagens de erro do site são em português.' },
+    { lines: [17,18,19,20,24,25,26], tag: 'DOIS GRUPOS (PROJECTS)', html: 'O coração da organização: <code>testMatch</code> é uma expressão regular dizendo "só os arquivos dentro dessa pasta". Um grupo pra testes sem login, outro pra testes com login real.' },
+  ],
+});
+</script>
+<script>
+FILES.push({
+  id: 'env',
+  path: '.env.example  /  .env',
+  title: '.env — o segredo fora do código',
+  desc: 'Guarda senha/email de teste fora do código, nunca enviado ao GitHub.',
+  code: `BASE_URL=https://app.clickmax.io
+WORKSPACE_SLUG=
+CLICKMAX_EMAIL=
+CLICKMAX_PASSWORD=`,
+  notes: [
+    { lines: [1,2,3,4], tag: '.ENV.EXAMPLE VAI PRO GITHUB', html: 'Esse arquivo é só um <b>modelo</b> — mostra quais variáveis existem, sem os valores reais.' },
+    { lines: [1,2,3,4], tag: '.ENV NÃO VAI', html: 'Existe uma cópia real, <code>.env</code> (sem <code>.example</code>), com os valores verdadeiros preenchidos. O <code>.gitignore</code> tem a linha <code>.env</code>, garantindo que o Git nunca envia esse arquivo com a senha pro repositório.' },
+    { lines: [1,2,3,4], tag: 'COMO USAR', html: 'Cada pessoa que for rodar o projeto copia o <code>.env.example</code> pra <code>.env</code> e preenche com os próprios dados de teste.' },
+  ],
+});
+
+FILES.push({
+  id: 'src-config',
+  path: 'src/config.ts',
+  title: 'src/config.ts — o guardião das variáveis de ambiente',
+  desc: 'Busca uma variável de ambiente e já avisa, com clareza, se ela não existir.',
+  code: `export function env(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(\`Variável de ambiente \${name} não definida (veja .env.example)\`);
+  }
+  return value;
+}`,
+  notes: [
+    { lines: [1], tag: 'TIPOS', html: '<code>(name: string)</code> diz que o parâmetro tem que ser texto; <code>: string</code> depois dos parênteses diz que a função sempre devolve texto. <code>export</code> deixa outros arquivos importarem essa função.' },
+    { lines: [2], tag: 'O ARMÁRIO', html: '<code>process.env</code> é onde o Node.js guarda as variáveis de ambiente (as que o dotenv carregou do <code>.env</code>). <code>process.env[name]</code> busca uma pelo nome.' },
+    { lines: [3,4,5], tag: 'FALHAR RÁPIDO', html: 'Se o valor não existir, a função <b>para tudo</b> e lança um erro com mensagem clara — melhor travar na hora do que dar um erro confuso lá na frente.' },
+    { lines: [4], tag: 'TEMPLATE LITERAL', html: 'As crases (<code>`</code>) permitem colocar uma variável (<code>${name}</code>) dentro do texto.' },
+  ],
+});
+</script>
+<script>
+FILES.push({
+  id: 'login-page',
+  path: 'src/pages/LoginPage.ts',
+  title: 'LoginPage.ts — o Page Object da tela de login',
+  desc: 'Tudo sobre a tela de login, guardado em um lugar só.',
+  code: `import { Page, Locator } from '@playwright/test';
+
+export class LoginPage {
+  readonly email: Locator;
+  readonly password: Locator;
+  readonly submit: Locator;
+  readonly forgotPassword: Locator;
+  readonly emailError: Locator;
+  readonly passwordError: Locator;
+  readonly loginError: Locator;
+
+  constructor(private readonly page: Page) {
+    this.email = page.getByTestId('login-email-input');
+    this.password = page.getByTestId('login-password-input');
+    this.submit = page.getByTestId('login-submit-button');
+    this.forgotPassword = page.getByTestId('login-forgot-password-button');
+    this.emailError = page.getByTestId('login-email-error');
+    this.passwordError = page.getByTestId('login-password-error');
+    this.loginError = page.locator('[data-cy="error-text"]');
+  }
+
+  async goto(): Promise<void> {
+    await this.page.goto('/login');
+  }
+
+  async login(email: string, password: string): Promise<void> {
+    await this.email.fill(email);
+    await this.password.fill(password);
+    await this.submit.click();
+  }
+}`,
+  notes: [
+    { lines: [1], tag: 'TIPOS DO PLAYWRIGHT', html: '<code>Page</code> representa uma aba do navegador; <code>Locator</code> representa "uma referência a um elemento na tela".' },
+    { lines: [3], tag: 'CLASSE = RECEITA', html: 'Uma classe é um molde pra criar objetos. Toda vez que alguém escreve <code>new LoginPage(page)</code>, "assa um bolo" seguindo essa receita.' },
+    { lines: [4,5,6,7,8,9,10], tag: 'SOMENTE LEITURA', html: '<code>readonly</code>: depois de definido uma vez, ninguém de fora troca esse valor sem querer. Essas 7 propriedades são públicas (sem <code>private</code>), então o teste consegue acessar <code>login.email</code>, por exemplo.' },
+    { lines: [12], tag: 'ATALHO DO CONSTRUCTOR', html: '<code>private readonly page: Page</code> dentro dos parênteses já cria <b>e</b> preenche a propriedade <code>page</code> sozinho, sem precisar escrever <code>this.page = page</code>. <code>private</code> = só código de dentro da classe acessa.' },
+    { lines: [13,14,15,16,17,18], tag: 'GETBYTESTID', html: 'Procura um elemento pelo atributo <code>data-testid</code> — criado só pra teste, que não muda por motivo visual ou de tradução.' },
+    { lines: [19], tag: 'ATRIBUTO DIFERENTE', html: 'Esse usa <code>data-cy</code> em vez de <code>data-testid</code> — sinal de que esse elemento específico ainda não tem o atributo padronizado (vale perguntar ao time de dev se dá pra padronizar).' },
+    { lines: [22,23,24], tag: 'MÉTODO GOTO', html: '<code>Promise&lt;void&gt;</code>: promete terminar no futuro, mas não devolve nenhum valor útil. Navega pra <code>/login</code> (vira <code>baseURL + /login</code>).' },
+    { lines: [26,27,28,29,30], tag: 'AÇÃO COMPLETA', html: 'Preenche email, preenche senha, clica em entrar — guardado aqui, qualquer teste chama <code>login.login(email, senha)</code> em vez de repetir essas 3 linhas.' },
+  ],
+});
+</script>
+<script>
+FILES.push({
+  id: 'login-page-spec',
+  path: 'tests/public/login-page.spec.ts',
+  title: 'login-page.spec.ts — testes sem login',
+  desc: 'Confere a tela de login sem precisar entrar no sistema de verdade.',
+  code: `import { test, expect } from '@playwright/test';
+import { LoginPage } from '../../src/pages/LoginPage';
+
+test.describe('Página de login', { tag: ['@smoke', '@safe'] }, () => {
+  test('exibe os campos e ações principais', async ({ page }) => {
+    const login = new LoginPage(page);
+    await login.goto();
+
+    await expect(page).toHaveURL(/\/login/);
+    await expect(login.email).toBeVisible();
+    await expect(login.password).toBeVisible();
+    await expect(login.submit).toBeVisible();
+    await expect(login.forgotPassword).toBeVisible();
+  });
+
+  test('exibe erros ao enviar sem preencher', async ({ page }) => {
+    const login = new LoginPage(page);
+    await login.goto();
+
+    await expect(login.emailError).not.toBeVisible();
+    await expect(login.passwordError).not.toBeVisible();
+    await login.submit.click();
+
+    await expect(login.emailError).toBeVisible();
+    await expect(login.emailError).toHaveText('Insira o seu e-mail');
+    await expect(login.passwordError).toBeVisible();
+    await expect(login.passwordError).toHaveText('Insira a sua senha');
+
+    await expect(page).toHaveURL(/\/login/);
+  });
+});`,
+  notes: [
+    { lines: [1,2], tag: 'IMPORTAÇÕES', html: '<code>test</code> declara um teste; <code>expect</code> verifica se algo é verdade. <code>LoginPage</code> vem do arquivo que já vimos.' },
+    { lines: [4], tag: 'AGRUPANDO E MARCANDO', html: '<code>test.describe</code> cria um grupo com nome. O segundo parâmetro marca <b>todos</b> os testes desse grupo com as tags de uma vez — diferente de marcar teste por teste.' },
+    { lines: [6,7], tag: 'MONTANDO O CENÁRIO', html: 'Destructuring de novo: <code>{ page }</code> pega o <code>page</code> de dentro do objeto de fixtures do Playwright. <code>new LoginPage(page)</code> "assa o bolo" de verdade.' },
+    { lines: [9,10,11,12,13], tag: 'CONFERINDO VISIBILIDADE', html: '<code>toBeVisible()</code> confere se o elemento está na tela. Esse teste só confirma que a tela carregou certo, sem nenhuma ação de verdade.' },
+    { lines: [20,21], tag: 'ANTES DE CLICAR', html: '<code>.not.toBeVisible()</code> inverte a verificação: confirma que os erros <b>não</b> aparecem antes de qualquer ação.' },
+    { lines: [22], tag: 'CLICA SEM PREENCHER', html: 'Clica direto no botão, sem chamar <code>login.login(...)</code> — de propósito, pra forçar o erro de validação.' },
+    { lines: [24,25,26,27], tag: 'DEPOIS DE CLICAR', html: '<code>toHaveText(...)</code> confere o texto exato da mensagem de erro — não só que apareceu, mas que diz exatamente o esperado.' },
+    { lines: [29], tag: 'CONTINUA NA TELA', html: 'Confirma que, mesmo com erro, a pessoa não foi redirecionada por engano.' },
+  ],
+});
+</script>
+<script>
+FILES.push({
+  id: 'login-success-spec',
+  path: 'tests/auth/login-success.spec.ts',
+  title: 'login-success.spec.ts — login de verdade',
+  desc: 'Entra no sistema com credenciais corretas.',
+  code: `import { test, expect } from '@playwright/test';
+import { LoginPage } from '../../src/pages/LoginPage';
+import { env } from '../../src/config';
+
+test.describe('Login com credenciais válidas', { tag: ['@smoke', '@safe'] }, () => {
+    test('entra no sistema com o usuário de teste', async ({ page }) => {
+        const login = new LoginPage(page);
+        await login.goto();
+
+        await login.login(env('CLICKMAX_EMAIL'), env('CLICKMAX_PASSWORD'));
+        await expect(page).toHaveURL(/overview$/);
+        await expect(page.getByRole('button', { name: 'Primeiros passos' })).toBeVisible();
+    });
+});`,
+  notes: [
+    { lines: [3], tag: 'NOVIDADE', html: 'Importa o <code>env</code> de <code>src/config.ts</code> — vai usar pra buscar as credenciais reais.' },
+    { lines: [9], tag: 'LOGIN DE VERDADE', html: 'Chama o método <code>login</code> do Page Object, passando email e senha reais, buscados do <code>.env</code> através da função protegida.' },
+    { lines: [10], tag: 'PROVA QUE FUNCIONOU', html: 'Confere se a URL termina em <code>overview</code> (o <code>$</code> na expressão regular = "fim do texto") — prova que a pessoa foi redirecionada pra dentro do sistema.' },
+    { lines: [11], tag: 'GETBYROLE', html: 'Jeito diferente de achar elemento: procura por <b>papel de acessibilidade</b> (<code>\'button\'</code>) <b>e</b> pelo texto visível. Útil quando não existe <code>data-testid</code> — aqui o teste confia no texto real da tela de boas-vindas.' },
+  ],
+});
+
+FILES.push({
+  id: 'login-failure-spec',
+  path: 'tests/auth/login-failure.spec.ts',
+  title: 'login-failure.spec.ts — senha errada',
+  desc: 'Confirma a mensagem de erro com senha incorreta.',
+  code: `import { test, expect } from '@playwright/test';
+import { LoginPage } from '../../src/pages/LoginPage';
+import { env } from '../../src/config';
+
+test.describe('Login com senha incorreta', { tag: ['@regression', '@safe'] }, () => {
+    test('mostra erro e permanece na tela de login', async ({ page }) => {
+        const login = new LoginPage(page);
+        await login.goto();
+
+        await login.login(env('CLICKMAX_EMAIL'), 'senha-incorreta-123');
+        await expect(login.loginError).toBeVisible();
+        await expect(login.loginError).toHaveText('Nome de usuário ou senha incorretos.');
+
+        await expect(page).toHaveURL(/login/);
+    });
+});`,
+  notes: [
+    { lines: [5], tag: '@REGRESSION, NÃO @SMOKE', html: 'Testar "o que acontece quando dá errado" é tipicamente regressão (confirma que o tratamento de erro continua funcionando), diferente do fluxo principal de sucesso.' },
+    { lines: [9], tag: 'SENHA ERRADA DE PROPÓSITO', html: 'Usa o email real, mas uma senha inventada direto no código — não precisa vir do <code>.env</code> porque não é segredo, é só um valor pra forçar o erro.' },
+    { lines: [10,11], tag: 'O LOCATOR data-cy', html: 'Usa <code>login.loginError</code>, aquele locator que vimos em <code>LoginPage.ts</code> usando <code>[data-cy="error-text"]</code>.' },
+    { lines: [13], tag: 'CONTINUA NO LOGIN', html: 'Confirma que a pessoa não foi pra dentro do sistema por engano, mesmo com a tentativa de login.' },
+  ],
+});
+</script>
+<script>
+FILES.push({
+  id: 'smoke-yml',
+  path: '.github/workflows/smoke.yml',
+  title: 'smoke.yml — o robô do GitHub',
+  desc: 'A receita que o GitHub Actions segue pra rodar os testes sozinho.',
+  code: `name: smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --project=public
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/`,
+  notes: [
+    { lines: [1], tag: 'YAML', html: 'Outro formato de configuração — parecido com uma lista organizada por indentação, sem chaves <code>{}</code>.' },
+    { lines: [3,4], tag: 'QUANDO RODA', html: '<code>workflow_dispatch</code>: só quando alguém clica manualmente em "Run workflow" no GitHub — não roda sozinho a cada <code>git push</code>.' },
+    { lines: [8], tag: 'MÁQUINA LIMPA', html: 'Roda numa máquina virtual Linux (Ubuntu), fornecida de graça pelo GitHub, do zero a cada execução.' },
+    { lines: [10], tag: 'PASSO 1', html: 'Baixa o código do repositório.' },
+    { lines: [11,12,13], tag: 'PASSO 2', html: 'Instala o Node.js versão 20 nessa máquina limpa.' },
+    { lines: [14], tag: 'PASSO 3', html: '<code>npm ci</code>: instala as dependências — parecido com <code>npm install</code>, mas mais rígido e rápido, usando exatamente as versões travadas.' },
+    { lines: [15], tag: 'PASSO 4', html: 'Baixa o navegador Chromium — essa máquina não tem Chrome já instalado, diferente da sua.' },
+    { lines: [16], tag: 'PASSO 5', html: 'Roda só o grupo <code>public</code> — sem senha real.' },
+    { lines: [17,18,19,20,21], tag: 'PASSO 6', html: 'Salva o relatório HTML como arquivo baixável, <code>sempre</code> (<code>if: always()</code>) — mesmo se os testes falharem.' },
+  ],
+});
+</script>
+<script>
+const KEYWORDS = new Set(['const','let','var','function','async','await','return','if','else','export','default',
+  'import','from','class','extends','new','this','true','false','null','undefined','throw','interface','type',
+  'readonly','private','public','static','void','string','number','boolean','name','uses','with','run','on','jobs',
+  'steps','runs-on']);
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function tokenizeLine(line){
+  const tokens = [];
+  let i = 0;
+  const n = line.length;
+  while (i < n) {
+    const ch = line[i];
+    if (ch === '"' || ch === "'" || ch === '`') {
+      let j = i + 1;
+      while (j < n && line[j] !== ch) {
+        if (line[j] === '\\') j++;
+        j++;
+      }
+      j = Math.min(j + 1, n);
+      tokens.push({ text: line.slice(i, j), cls: 'tok-str' });
+      i = j;
+      continue;
+    }
+    if (ch === '/' && line[i + 1] === '/') {
+      tokens.push({ text: line.slice(i), cls: 'tok-com' });
+      break;
+    }
+    if (ch === '#' && /^\s*#/.test(line.slice(0, i + 1))) {
+      tokens.push({ text: line.slice(i), cls: 'tok-com' });
+      break;
+    }
+    if (/[0-9]/.test(ch)) {
+      let j = i;
+      while (j < n && /[0-9.]/.test(line[j])) j++;
+      tokens.push({ text: line.slice(i, j), cls: 'tok-num' });
+      i = j;
+      continue;
+    }
+    if (/[A-Za-z_$]/.test(ch)) {
+      let j = i;
+      while (j < n && /[A-Za-z0-9_$-]/.test(line[j])) j++;
+      const word = line.slice(i, j);
+      tokens.push({ text: word, cls: KEYWORDS.has(word) ? 'tok-kw' : null });
+      i = j;
+      continue;
+    }
+    tokens.push({ text: ch, cls: null });
+    i++;
+  }
+  return tokens;
+}
+
+function highlightLine(line){
+  return tokenizeLine(line).map(t => {
+    const safe = escapeHtml(t.text);
+    return t.cls ? `<span class="${t.cls}">${safe}</span>` : safe;
+  }).join('');
+}
+</script>
+<script>
+const SECTIONS = [
+  { id: 'fundamentals', kind: 'concepts', label: 'Fundamentos', group: 'FUNDAMENTOS' },
+  ...FILES.map(f => ({ ...f, kind: 'file', label: f.path, group: 'ARQUIVOS' })),
+];
+
+let current = 0;
+
+function renderSidebar(){
+  const rail = document.getElementById('railScroll');
+  rail.innerHTML = SECTIONS.map((s, i) => `
+    <button class="rail-item" data-idx="${i}">
+      <span class="num">${String(i + 1).padStart(2, '0')}</span>
+      <span>${escapeHtml(s.label)}</span>
+    </button>
+  `).join('');
+  rail.querySelectorAll('.rail-item').forEach(btn => {
+    btn.addEventListener('click', () => goTo(parseInt(btn.dataset.idx, 10)));
+  });
+}
+
+function renderConceptsPanel(){
+  const grid = CONCEPTS.map(c => `
+    <div class="concept">
+      <h3>${escapeHtml(c.title)}</h3>
+      <p>${escapeHtml(c.text)}</p>
+      ${c.snippet ? `<div class="snippet">${escapeHtml(c.snippet)}</div>` : ''}
+    </div>
+  `).join('');
+  return `
+    <div class="file-head">
+      <div class="path">ANTES DE QUALQUER CÓDIGO</div>
+      <h2>Conceitos fundamentais</h2>
+      <p>Pra quem nunca viu automação de testes: os termos que vão aparecer em todo arquivo daqui pra frente.</p>
+    </div>
+    <div class="concept-grid">${grid}</div>
+  `;
+}
+
+function renderFilePanel(file){
+  const lines = file.code.split('\n');
+  const codeHtml = lines.map((line, idx) => `
+    <div class="codeline" data-line="${idx + 1}">
+      <div class="ln">${idx + 1}</div>
+      <div class="lc">${highlightLine(line) || '&nbsp;'}</div>
+    </div>
+  `).join('');
+  const notesHtml = file.notes.map((note, ni) => `
+    <div class="note" data-lines="${note.lines.join(',')}" data-note="${ni}">
+      <span class="tag">${escapeHtml(note.tag)}</span>
+      <p>${note.html}</p>
+    </div>
+  `).join('');
+  return `
+    <div class="file-head">
+      <div class="path">${escapeHtml(file.path)}</div>
+      <h2>${escapeHtml(file.title)}</h2>
+      <p>${escapeHtml(file.desc)}</p>
+    </div>
+    <div class="layout-2col">
+      <div class="codecard">
+        <div class="codecard-head"><span>${escapeHtml(file.path)}</span></div>
+        <div class="codebody" id="codebody-${file.id}">${codeHtml}</div>
+      </div>
+      <div class="notes" id="notes-${file.id}">${notesHtml}</div>
+    </div>
+  `;
+}
+
+function renderPanels(){
+  const root = document.getElementById('panels');
+  root.innerHTML = SECTIONS.map((s, i) => `
+    <div class="panel" id="panel-${i}">
+      ${s.kind === 'concepts' ? renderConceptsPanel() : renderFilePanel(s)}
+    </div>
+  `).join('');
+
+  SECTIONS.forEach((s, i) => {
+    if (s.kind !== 'file') return;
+    const panel = document.getElementById(`panel-${i}`);
+    panel.querySelectorAll('.note').forEach(noteEl => {
+      noteEl.addEventListener('click', () => {
+        const activeWasSet = noteEl.classList.contains('active');
+        panel.querySelectorAll('.note').forEach(n => n.classList.remove('active'));
+        panel.querySelectorAll('.codeline').forEach(l => l.classList.remove('hl'));
+        if (activeWasSet) return;
+        noteEl.classList.add('active');
+        const lineNums = noteEl.dataset.lines.split(',').map(Number);
+        let firstEl = null;
+        lineNums.forEach(ln => {
+          const lineEl = panel.querySelector(`.codeline[data-line="${ln}"]`);
+          if (lineEl) { lineEl.classList.add('hl'); if (!firstEl) firstEl = lineEl; }
+        });
+        if (firstEl) firstEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    });
+    panel.querySelectorAll('.codeline').forEach(lineEl => {
+      lineEl.addEventListener('click', () => {
+        const ln = lineEl.dataset.line;
+        panel.querySelectorAll('.note').forEach(n => n.classList.remove('active'));
+        panel.querySelectorAll('.codeline').forEach(l => l.classList.remove('hl'));
+        const matches = [...panel.querySelectorAll('.note')].filter(n =>
+          n.dataset.lines.split(',').includes(ln));
+        matches.forEach(n => n.classList.add('active'));
+        lineEl.classList.add('hl');
+        if (matches[0]) matches[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    });
+  });
+}
+</script>
+<script>
+function goTo(idx){
+  current = Math.max(0, Math.min(SECTIONS.length - 1, idx));
+  document.querySelectorAll('.rail-item').forEach((btn, i) => {
+    btn.classList.toggle('active', i === current);
+  });
+  document.querySelectorAll('.panel').forEach((p, i) => {
+    p.classList.toggle('active', i === current);
+  });
+  const s = SECTIONS[current];
+  document.getElementById('crumb').textContent = s.group;
+  document.getElementById('progressPill').textContent = `${current + 1} / ${SECTIONS.length}`;
+
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  prevBtn.disabled = current === 0;
+  nextBtn.disabled = current === SECTIONS.length - 1;
+  document.getElementById('prevLabel').textContent = current > 0 ? SECTIONS[current - 1].label : '';
+  document.getElementById('nextLabel').textContent = current < SECTIONS.length - 1 ? SECTIONS[current + 1].label : '';
+
+  try { localStorage.setItem('clickmax_walkthrough_idx', String(current)); } catch (e) {}
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+document.getElementById('prevBtn').addEventListener('click', () => goTo(current - 1));
+document.getElementById('nextBtn').addEventListener('click', () => goTo(current + 1));
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'ArrowRight') goTo(current + 1);
+  if (e.key === 'ArrowLeft') goTo(current - 1);
+});
+
+renderSidebar();
+renderPanels();
+let startIdx = 0;
+try {
+  const saved = parseInt(localStorage.getItem('clickmax_walkthrough_idx') || '0', 10);
+  if (saved >= 0 && saved < SECTIONS.length) startIdx = saved;
+} catch (e) {}
+goTo(startIdx);
+</script>
