@@ -18,13 +18,13 @@ export class LoginPage {
     this.passwordError = page.getByTestId('login-password-error');
     this.loginError = page.locator('[data-cy="error-text"]');
   }
-
   async goto(): Promise<void> {
     await this.page.goto('/login');
   }
 
   async login(email: string, password: string): Promise<void> {
     await this.email.fill(email);
+    await this.submit.click();
     await this.password.fill(password);
     await this.submit.click();
   }
