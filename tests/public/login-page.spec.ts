@@ -8,12 +8,15 @@ test.describe('Página de login', { tag: ['@smoke', '@safe'] }, () => {
 
     await expect(page).toHaveURL(/\/login/);
     await expect(login.email).toBeVisible();
-    await expect(login.password).toBeVisible();
+
+    // O novo fluxo de login exibe primeiro a etapa de e-mail.
+    // Os controles de senha permanecem ocultos nesta etapa.
+    await expect(login.password).toBeHidden();
     await expect(login.submit).toBeVisible();
-    await expect(login.forgotPassword).toBeVisible();
+    await expect(login.forgotPassword).toBeHidden();
   });
 
-  test('exibe erros ao enviar sem preencher', async ({ page }) => {
+  test('exibe erro ao enviar e-mail vazio', async ({ page }) => {
     const login = new LoginPage(page);
     await login.goto();
 
@@ -21,11 +24,10 @@ test.describe('Página de login', { tag: ['@smoke', '@safe'] }, () => {
     await expect(login.passwordError).not.toBeVisible();
     await login.submit.click();
 
+    // A etapa inicial valida apenas o e-mail.
     await expect(login.emailError).toBeVisible();
     await expect(login.emailError).toHaveText('Insira o seu e-mail');
-    await expect(login.passwordError).toBeVisible();
-    await expect(login.passwordError).toHaveText('Insira a sua senha');
-
+    await expect(login.passwordError).toBeHidden();
     await expect(page).toHaveURL(/\/login/);
   });
 });
