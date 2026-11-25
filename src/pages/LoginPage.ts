@@ -23,8 +23,14 @@ export class LoginPage {
     await this.page.goto('/login');
   }
 
-  async login(email: string, password: string): Promise<void> {
+  async continueWithEmail(email: string): Promise<void> {
     await this.email.fill(email);
+    await this.submit.click();
+  }
+
+  async login(email: string, password: string): Promise<void> {
+    await this.continueWithEmail(email);
+    await this.password.waitFor({ state: 'visible' });
     await this.password.fill(password);
     await this.submit.click();
   }
